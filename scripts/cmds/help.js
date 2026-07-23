@@ -1,354 +1,162 @@
-
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs-extra");
+const axios = require("axios");
+const path = require("path");
+const { getPrefix } = global.utils;
+const { commands, aliases } = global.GoatBot;
 
 module.exports = {
-	config: {
-		name: "help",
-		version: "2.4.74",
-		role: 0,
-		countDown: 0,
-		author: "ST | Sheikh Tamim",
-		description: "Displays all available commands and their categories.",
-		category: "help"
-	},
+  config: {
+    name: "help",
+    aliases:["use", "cmdl"],
+    version: "1.18",
+    author: "chris", 
+    countDown: 5,
+    role: 0,
+    shortDescription: {
+      en: "View command usage",
+    },
+    longDescription: {
+      en: "View command usage and list all commands or commands by category",
+    },
+    category: "info",
+    guide: {
+      en: "{pn} / help cmdName\n{pn} -c <categoryName>",
+    },
+    priority: 1,
+  },
 
-	ST: async ({ api, event, args }) => {
-		const cmdsFolderPath = path.join(__dirname, '.');
-		const files = fs.readdirSync(cmdsFolderPath).filter(file => file.endsWith('.js'));
+  onStart: async function ({ message, args, event, threadsData, role }) {
+    const { threadID } = event;
+    const threadData = await threadsData.get(threadID);
+    const prefix = getPrefix(threadID);
 
-		const sendMessage = async (message, threadID, messageID = null) => {
-			try {
-				return await api.sendMessage(message, threadID, messageID);
-			} catch (error) {
-				console.error('Error sending message:', error);
-			}
-		};
+    if (args.length === 0) {
+      const categories = {};
+      let msg = "";
 
-		const getCategories = () => {
-			const categories = {};
-			for (const file of files) {
-				try {
-					const command = require(path.join(cmdsFolderPath, file));
-					const { category } = command.config;
-					const categoryName = category || 'uncategorized';
-					if (!categories[categoryName]) categories[categoryName] = [];
-					categories[categoryName].push(command.config);
-				} catch (error) {
-					// Skip invalid command files
-				}
-			}
-			return categories;
-		};
+      msg += `╔══════════════╗\n🔹 𝙼𝙸𝙽𝙰𝚃𝙾 𝙽𝙰𝙼𝙸𝙺𝙰𝚉𝙴 🔹\n╚══════════════╝\n`;
 
-		try {
-			// If specific command requested directly
-			if (args[0] && !args[0].match(/^\d+$/)) {
-				const commandName = args[0].toLowerCase();
-				const command = files.map(file => {
-					try {
-						return require(path.join(cmdsFolderPath, file));
-					} catch {
-						return null;
-					}
-				}).filter(cmd => cmd !== null)
-				.find(cmd => cmd.config.name.toLowerCase() === commandName || (cmd.config.aliases && cmd.config.aliases.includes(commandName)));
+      for (const [name, value] of commands) {
+        if (value.config.role > 1 && role < value.config.role) continue;
 
-				if (command) {
-					// Display command details
-					let commandDetails = `╭─────────────────────◊\n`;
-					commandDetails += `│  🔹 COMMAND DETAILS\n`;
-					commandDetails += `├─────────────────────◊\n`;
-					commandDetails += `│ ⚡ Name: ${command.config.name}\n`;
-					commandDetails += `│ 📝 Version: ${command.config.version || 'N/A'}\n`;
-					commandDetails += `│ 👤 Author: ${command.config.author || 'Unknown'}\n`;
-					commandDetails += `│ 🔐 Role: ${command.config.role !== undefined ? command.config.role : 'N/A'}\n`;
-					commandDetails += `│ 📂 Category: ${command.config.category || 'uncategorized'}\n`;
-					commandDetails += `│ 💎 Premium: ${command.config.premium == true ? '✅ Required' : '❌ Not Required'}\n`;
-					commandDetails += `│ 🔧 Use Prefix: ${command.config.usePrefix !== undefined ? (command.config.usePrefix ? '✅ Required' : '❌ Not Required') : '⚙️ Global Setting'}\n`;
+        const category = value.config.category || "Uncategorized";
+        categories[category] = categories[category] || { commands: [] };
+        categories[category].commands.push(name);
+      }
 
-					if (command.config.aliases && command.config.aliases.length > 0) {
-						commandDetails += `│ 🔄 Aliases: ${command.config.aliases.join(', ')}\n`;
-					}
+      Object.keys(categories).forEach((category) => {
+        if (category !== "info") {
+          msg += `\n╭────────────⭓\n│『 ${category.toUpperCase()} 』`;
 
-					if (command.config.countDown !== undefined) {
-						commandDetails += `│ ⏱️ Cooldown: ${command.config.countDown}s\n`;
-					}
+          const names = categories[category].commands.sort();
+          names.forEach((item) => {
+            msg += `\n│𖤍 ${item}`;
+          });
 
-					// Display unsend configuration if present
-					if (command.config.unsend !== undefined && command.config.unsend !== null) {
-						let unsendDisplay;
-						if (typeof command.config.unsend === 'number') {
-							unsendDisplay = `${command.config.unsend}s`;
-						} else if (typeof command.config.unsend === 'string') {
-							unsendDisplay = command.config.unsend;
-						}
-						commandDetails += `│ 🗑️ Auto-unsend: ${unsendDisplay}\n`;
-					}
+          msg += `\n╰────────⭓`;
+        }
+      });
 
-					commandDetails += `├─────────────────────◊\n`;
+      const totalCommands = commands.size;
+      msg += `\n𝙰𝚌𝚝𝚞𝚎𝚕𝚕𝚎𝚖𝚎𝚗𝚝,  𝚖𝚒𝚗𝚊𝚝𝚘 à ${totalCommands} 𝙲𝚘𝚖𝚖𝚊𝚗𝚍𝚎𝚜 𝚞𝚝𝚒𝚕𝚒𝚜𝚊𝚋𝚕𝚎𝚜\n`;
+      msg += `\n𝗧𝘆𝗽𝗲 ${prefix}𝚑𝚎𝚕𝚙 𝚗𝚘𝚖 𝚍𝚎 𝚕𝚊 𝚌𝚖𝚍  𝚙𝚘𝚞𝚛 𝚊𝚏𝚏𝚒𝚌𝚑𝚎𝚛 𝚕𝚎𝚜 𝚍é𝚝𝚊𝚒𝚕𝚜 𝚍𝚎 𝚌𝚎𝚝𝚝𝚎 𝚌𝚘𝚖𝚖𝚊𝚗𝚍𝚎\n`;
+      msg += `\n🫧𝑩𝑶𝑻 𝑵𝑨𝑴𝑬🫧:𝙼𝙸𝙽𝙰𝚃𝙾 𝙽𝙰𝙼𝙸𝙺𝙰𝚉𝙴⭕`;
+      msg += `\n𓀬 𝐁𝐎𝐓 𝐎𝐖𝐍𝐄𝐑 𓀬`;
+      msg += `\n 	 					`;
+      msg += `\n~𝙉𝘼𝙈𝙀:𝙲𝙷𝚁𝙸𝚂 𝚂𝚃`;
+      msg += `\n~𝙁𝘽:https://www.facebook.com/profile.php?id=100094118835962`;
 
-					// Description
-					if (command.config.description) {
-						const desc = typeof command.config.description === 'string' ? command.config.description : command.config.description.en || 'No description available';
-						commandDetails += `│ 📋 Description:\n│ ${desc}\n├─────────────────────◊\n`;
-					}
+      
+      const helpListImages = [
+ 
+"https://i.ibb.co/Kgn10xG/684797258-1327405002818159-3504065921443860282-n-jpg-stp-dst-jpg-p480x480-tt6-nc-cat-109-ccb-1-7-n.jpg",
+"https://i.ibb.co/HT4Hk6SF/649666902-1547549473009164-5960445224328660848-n-jpg-stp-dst-jpg-p480x480-tt6-nc-cat-104-ccb-1-7-n.jpg', ",
+"https://i.ibb.co/HTjs925j/685155293-936519109213674-2388955215511618307-n-jpg-stp-dst-jpg-s480x480-tt6-nc-cat-105-ccb-1-7-nc.jpg",
+"https://i.ibb.co/svXBgxw2/516688787-1388605512441969-5696309895683148133-n-jpg-stp-dst-jpg-p480x480-tt6-nc-cat-107-ccb-1-7-n.jpg",
+"https://i.ibb.co/0HkWH81/691200995-2775407616149485-9104723335245991500-n-gif-nc-cat-106-ccb-1-7-nc-sid-cf94fc-nc-eui2-Ae-E.gif",
+"https://i.ibb.co/VYLq0rX3/495047004-2156248254796411-1328262576645206658-n-jpg-stp-dst-jpg-s480x480-tt6-nc-cat-108-ccb-1-7-n.jpg",
+"https://i.ibb.co/rTMN49m/686398590-1537926281285123-3076869716863077899-n-jpg-stp-dst-jpg-p480x480-tt6-nc-cat-102-ccb-1-7-n.jpg"
+];
+ 
+ 
+      const helpListImage = helpListImages[Math.floor(Math.random() * helpListImages.length)];
+ 
 
-					// Guide/Usage
-					const guideText = command.config.guide ? (typeof command.config.guide === 'string' ? command.config.guide : command.config.guide.en || 'No guide available') : 'No guide available';
-					commandDetails += `│ 📚 Usage Guide:\n│ ${guideText.replace(/{pn}/g, `!${command.config.name}`)}\n`;
+      await message.reply({
+        body: msg,
+      });
+    } else if (args[0] === "-c") {
+      if (!args[1]) {
+        await message.reply("Please specify a category name.");
+        return;
+      }
 
-					commandDetails += `╰─────────────────────◊\n`;
-					commandDetails += `     💫 ST_BOT Command Info`;
+      const categoryName = args[1].toLowerCase();
+      const filteredCommands = Array.from(commands.values()).filter(
+        (cmd) => cmd.config.category?.toLowerCase() === categoryName
+      );
 
-					await sendMessage(commandDetails, event.threadID);
-				} else {
-					await sendMessage(`❌ Command not found: ${commandName}`, event.threadID);
-				}
-			} else {
-				// Stage 1: Show categories with serial numbers
-				const categories = getCategories();
-				const categoryNames = Object.keys(categories).sort();
-				
-				let helpMessage = '╭─────────────────────◊\n';
-				helpMessage += '│     📋 COMMAND CATEGORIES\n';
-				helpMessage += '├─────────────────────◊\n';
-				
-				categoryNames.forEach((category, index) => {
-					const commandCount = categories[category].length;
-					helpMessage += `│ ${index + 1}. ${category.charAt(0).toUpperCase() + category.slice(1)}\n`;
-					helpMessage += `│    └─ ${commandCount} commands\n`;
-				});
-				
-				helpMessage += '├─────────────────────◊\n';
-				helpMessage += '│ 💡 Reply with category number\n';
-				helpMessage += '│    to see commands\n';
-				helpMessage += '│ 💡 Type !help <cmdname>\n';
-				helpMessage += '│    for direct command info\n';
-				helpMessage += '╰─────────────────────◊\n';
-				helpMessage += '        💫 ST_BOT Help Menu';
+      if (filteredCommands.length === 0) {
+        await message.reply(`No commands found in the category "${categoryName}".`);
+        return;
+      }
 
-				const sentMessage = await sendMessage(helpMessage, event.threadID);
-				
-				// Set up onReply for category selection (Stage 1)
-				if (sentMessage) {
-					global.GoatBot.onReply.set(sentMessage.messageID, {
-						commandName: "help",
-						messageID: sentMessage.messageID,
-						author: event.senderID,
-						stage: 1,
-						categories: categoryNames,
-						categoriesData: categories
-					});
-				}
-			}
-		} catch (error) {
-			console.error('Error generating help message:', error);
-			await sendMessage('An error occurred while generating the help message.', event.threadID);
-		}
-	},
+      let msg = `╔══════════════╗\n༒︎ ${categoryName.toUpperCase()} COMMANDS ༒︎\n╚══════════════╝\n`;
 
-	onReply: async ({ api, event, Reply }) => {
-		if (Reply.author != event.senderID) {
-			return api.sendMessage("❌ This is not for you!", event.threadID, event.messageID);
-		}
+      filteredCommands.forEach((cmd) => {
+        msg += `\n☠︎︎ ${cmd.config.name} `;
+      });
 
-		const choice = parseInt(event.body.trim());
+      await message.reply(msg);
+    } else {
+      const commandName = args[0].toLowerCase();
+      const command = commands.get(commandName) || commands.get(aliases.get(commandName));
 
-		try {
-			if (Reply.stage === 1) {
-				// Stage 2: User selected a category - show commands with serial numbers
-				if (isNaN(choice) || choice < 1 || choice > Reply.categories.length) {
-					return api.sendMessage(`❌ Invalid choice. Please reply with a number between 1 and ${Reply.categories.length}.`, event.threadID, event.messageID);
-				}
+      if (!command) {
+        await message.reply(`Command "${commandName}" not found.`);
+      } else {
+        const configCommand = command.config;
+        const roleText = roleTextToString(configCommand.role);
+        const author = configCommand.author || "Unknown";
 
-				const selectedCategory = Reply.categories[choice - 1];
-				const commands = Reply.categoriesData[selectedCategory].sort((a, b) => a.name.localeCompare(b.name));
+        const longDescription = configCommand.longDescription
+          ? configCommand.longDescription.en || "No description"
+          : "No description";
 
-				let categoryMessage = `╭─────────────────────◊\n`;
-				categoryMessage += `│  📂 ${selectedCategory.toUpperCase()} COMMANDS\n`;
-				categoryMessage += `├─────────────────────◊\n`;
+        const guideBody = configCommand.guide?.en || "No guide available.";
+        const usage = guideBody.replace(/{p}/g, prefix).replace(/{n}/g, configCommand.name);
 
-				commands.forEach((cmd, index) => {
-					categoryMessage += `│ ${index + 1}. ${cmd.name}\n`;
-				});
+        const response = `╭── 𝙼𝙸𝙽𝙰𝚃𝙾 𝚅𝟹 ────⭓\n` +
+          `│ ${configCommand.name}\n` +
+          `├── 𝑰𝑵𝑭𝑶\n` +
+          `│ 𝐷𝑒𝑠𝑐𝑟𝑖𝑝𝑡𝑖𝑜𝑛: ${longDescription}\n` +
+          `│ 𝑂𝑡ℎ𝑒𝑟 𝑁𝑎𝑚𝑒: ${configCommand.aliases ? configCommand.aliases.join(", ") : "Do not have"}\n` +
+          `│ 𝑉𝑒𝑟𝑠𝑖𝑜𝑛: ${configCommand.version || "1.0"}\n` +
+          `│ 𝑅𝑜𝑙𝑒: ${roleText}\n` +
+          `│ 𝑇𝑖𝑚𝑒 𝑃𝑒𝑟 𝐶𝑜𝑚𝑚𝑎𝑛𝑑: ${configCommand.countDown || 1}s\n` +
+          `│ 𝐴𝑢𝑡ℎ𝑜𝑟: ${author}\n` +
+          `├── 𝑼𝑺𝑨𝑮𝑬\n` +
+          `│ ${usage}\n` +
+          `├── 𝑵𝑶𝑻𝑬𝑺\n` +
+          `│ 𝑇ℎ𝑒 𝑐𝑜𝑛𝑡𝑒𝑛𝑡 𝑖𝑛𝑠𝑖𝑑𝑒 𝙼𝙸𝙽𝙰𝚃𝙾 𝚅𝟹 𝑐𝑎𝑛 𝑏𝑒 𝑐ℎ𝑎𝑛𝑔𝑒𝑑\n` +
+          `│ ♕︎ 𝐎𝐖𝐍𝐄𝐑 ♕︎:☠︎︎ 𝙼𝙸𝙽𝙰𝚃𝙾 𝚅𝟹 ☠︎︎\n` +
+          `╰━━━━━━━❖`;
 
-				categoryMessage += `├─────────────────────◊\n`;
-				categoryMessage += `│ 💡 Reply with command number\n`;
-				categoryMessage += `│    for detailed info\n`;
-				categoryMessage += `│ 💡 Type 0 to go back\n`;
-				categoryMessage += `╰─────────────────────◊\n`;
-				categoryMessage += `   Total: ${commands.length} commands`;
-
-				// Delete old onReply data and unsend previous message
-				global.GoatBot.onReply.delete(Reply.messageID);
-				try {
-					await api.unsendMessage(Reply.messageID);
-				} catch (error) {
-					console.error('Error unsending message:', error);
-				}
-
-				const sentMessage = await api.sendMessage(categoryMessage, event.threadID);
-
-				// Set up onReply for command selection (Stage 2)
-				if (sentMessage) {
-					global.GoatBot.onReply.set(sentMessage.messageID, {
-						commandName: "help",
-						messageID: sentMessage.messageID,
-						author: event.senderID,
-						stage: 2,
-						commands: commands,
-						selectedCategory: selectedCategory,
-						parentCategories: Reply.categories,
-						parentCategoriesData: Reply.categoriesData
-					});
-				}
-
-			} else if (Reply.stage === 2) {
-				// Check if user wants to go back to categories
-				if (choice === 0) {
-					const categoryNames = Reply.parentCategories;
-					const categories = Reply.parentCategoriesData;
-					
-					let helpMessage = '╭─────────────────────◊\n';
-					helpMessage += '│     📋 COMMAND CATEGORIES\n';
-					helpMessage += '├─────────────────────◊\n';
-					
-					categoryNames.forEach((category, index) => {
-						const commandCount = categories[category].length;
-						helpMessage += `│ ${index + 1}. ${category.charAt(0).toUpperCase() + category.slice(1)}\n`;
-						helpMessage += `│    └─ ${commandCount} commands\n`;
-					});
-					
-					helpMessage += '├─────────────────────◊\n';
-					helpMessage += '│ 💡 Reply with category number\n';
-					helpMessage += '│    to see commands\n';
-					helpMessage += '│ 💡 Type !help <cmdname>\n';
-					helpMessage += '│    for direct command info\n';
-					helpMessage += '╰─────────────────────◊\n';
-					helpMessage += '        💫 ST_BOT Help Menu';
-
-					// Delete old onReply data and unsend previous message
-					global.GoatBot.onReply.delete(Reply.messageID);
-					try {
-						await api.unsendMessage(Reply.messageID);
-					} catch (error) {
-						console.error('Error unsending message:', error);
-					}
-
-					const sentMessage = await api.sendMessage(helpMessage, event.threadID);
-					
-					// Set up onReply for category selection (back to Stage 1)
-					if (sentMessage) {
-						global.GoatBot.onReply.set(sentMessage.messageID, {
-							commandName: "help",
-							messageID: sentMessage.messageID,
-							author: event.senderID,
-							stage: 1,
-							categories: categoryNames,
-							categoriesData: categories
-						});
-					}
-					return;
-				}
-
-				// Stage 3: User selected a specific command - show full details
-				if (isNaN(choice) || choice < 1 || choice > Reply.commands.length) {
-					return api.sendMessage(`❌ Invalid choice. Please reply with a number between 1 and ${Reply.commands.length}, or 0 to go back.`, event.threadID, event.messageID);
-				}
-
-				const selectedCommand = Reply.commands[choice - 1];
-
-				// Delete old onReply data and unsend previous message
-				global.GoatBot.onReply.delete(Reply.messageID);
-				try {
-					await api.unsendMessage(Reply.messageID);
-				} catch (error) {
-					console.error('Error unsending message:', error);
-				}
-
-				try {
-					// Load the actual command file to get complete details
-					const cmdsFolderPath = path.join(__dirname, '.');
-					const files = fs.readdirSync(cmdsFolderPath).filter(file => file.endsWith('.js'));
-					
-					let fullCommand = null;
-					for (const file of files) {
-						try {
-							const command = require(path.join(cmdsFolderPath, file));
-							if (command.config.name.toLowerCase() === selectedCommand.name.toLowerCase()) {
-								fullCommand = command;
-								break;
-							}
-						} catch (error) {
-							// Skip invalid command files
-						}
-					}
-
-					if (!fullCommand) {
-						fullCommand = { config: selectedCommand };
-					}
-
-					let commandDetails = `╭─────────────────────◊\n`;
-					commandDetails += `│  🔹 COMMAND DETAILS\n`;
-					commandDetails += `├─────────────────────◊\n`;
-					commandDetails += `│ ⚡ Name: ${fullCommand.config.name}\n`;
-					commandDetails += `│ 📝 Version: ${fullCommand.config.version || 'N/A'}\n`;
-					commandDetails += `│ 👤 Author: ${fullCommand.config.author || 'Unknown'}\n`;
-					commandDetails += `│ 🔐 Role: ${fullCommand.config.role !== undefined ? fullCommand.config.role : 'N/A'}\n`;
-					commandDetails += `│ 📂 Category: ${fullCommand.config.category || 'uncategorized'}\n`;
-					commandDetails += `│ 💎 Premium: ${fullCommand.config.premium == true ? '✅ Required' : '❌ Not Required'}\n`;
-					commandDetails += `│ 🔧 Use Prefix: ${fullCommand.config.usePrefix !== undefined ? (fullCommand.config.usePrefix ? '✅ Required' : '❌ Not Required') : '⚙️ Global Setting'}\n`;
-
-					if (fullCommand.config.aliases && fullCommand.config.aliases.length > 0) {
-						commandDetails += `│ 🔄 Aliases: ${fullCommand.config.aliases.join(', ')}\n`;
-					}
-
-					if (fullCommand.config.countDown !== undefined) {
-						commandDetails += `│ ⏱️ Cooldown: ${fullCommand.config.countDown}s\n`;
-					}
-
-					// Display unsend configuration if present
-					if (fullCommand.config.unsend !== undefined && fullCommand.config.unsend !== null) {
-						let unsendDisplay;
-						if (typeof fullCommand.config.unsend === 'number') {
-							unsendDisplay = `${fullCommand.config.unsend}s`;
-						} else if (typeof fullCommand.config.unsend === 'string') {
-							unsendDisplay = fullCommand.config.unsend;
-						}
-						commandDetails += `│ 🗑️ Auto-unsend: ${unsendDisplay}\n`;
-					}
-
-					commandDetails += `├─────────────────────◊\n`;
-
-					// Description
-					if (fullCommand.config.description) {
-						const desc = typeof fullCommand.config.description === 'string' ? fullCommand.config.description : fullCommand.config.description.en || 'No description available';
-						commandDetails += `│ 📋 Description:\n│ ${desc}\n├─────────────────────◊\n`;
-					}
-
-					// Guide/Usage
-					let guideText = 'No guide available';
-					if (fullCommand.config.guide) {
-						guideText = typeof fullCommand.config.guide === 'string' ? fullCommand.config.guide : fullCommand.config.guide.en || 'No guide available';
-					}
-
-					commandDetails += `│ 📚 Usage Guide:\n│ ${guideText.replace(/{pn}/g, `!${fullCommand.config.name}`)}\n`;
-
-					commandDetails += `╰─────────────────────◊\n`;
-					commandDetails += `     💫 ST_BOT Command Info`;
-
-					// Send command details (final stage - no new onReply needed)
-					await api.sendMessage(commandDetails, event.threadID);
-					
-				} catch (error) {
-					console.error('Error sending command details:', error);
-					await api.sendMessage('❌ An error occurred while displaying command details.', event.threadID, event.messageID);
-				}
-			}
-		} catch (error) {
-			console.error('Error in help onReply:', error);
-			api.sendMessage('❌ An error occurred while processing your request.', event.threadID, event.messageID);
-		}
-	}
+        await message.reply(response);
+      }
+    }
+  },
 };
+
+function roleTextToString(roleText) {
+  switch (roleText) {
+    case 0:
+      return "0 (All users)";
+    case 1:
+      return "1 (Group administrators)";
+    case 2:
+      return "2 (Admin bot)";
+    default:
+      return "Unknown role";
+  }
+}
