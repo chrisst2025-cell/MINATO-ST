@@ -6,11 +6,11 @@ module.exports = {
 		name: "bank",
 		aliases: [],
 		version: "2.4.71",
-		author: "ST BOT",
+		author: "chris st",
 		countDown: 5,
 		role: 0,
 		description: {
-			en: "ST BOT Banking System - Complete banking solution with loans, investments, games, and more"
+			en: "MINATO Banking System - Complete banking solution with loans, investments, games, and more"
 		},
 		category: "economy",
 		guide: {
