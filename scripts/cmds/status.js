@@ -118,9 +118,9 @@ module.exports = {
           return "🔴 High";
         };
 
-        const response = `╭─────────────────────────────────╮
-│           🤖 ST BOT STATUS           │
-╰─────────────────────────────────╯
+        const response = `╭─────────────────────────────╮
+│           🥷🏻MINATO STATUS           │
+╰─────────────────────────────╯
 
 📡 Network Performance
 ├─ API Ping: ${apiPing}ms ${getStatusIndicator(apiPing)}
